@@ -2,6 +2,17 @@
 #include <Adafruit_MCP3008.h>
 #include <MegunoLink.h>
 #include <Filter.h>
+#include <FirebaseESP32.h>
+#include <WiFi.h>
+
+
+
+#define WIFI_SSID "iPhone" // enter your wifi SSID
+#define WIFI_PASSWORD "deeznutz" //enter your wifi PASSWORD
+#define FIREBASE_HOST "led-demo-909df-default-rtdb.firebaseio.com" // firebase host
+#define FIREBASE_AUTH "vyCvYr8OlIkM4axJ2Ni4t7sGfpEiYoGwbIavZPOx"  // firebase auth
+FirebaseData firebaseData; // firebase data object
+
 
 // Pin definitions (fixed)
 const int LED_DATA_PIN = 8;
@@ -38,10 +49,18 @@ enum mode {
 // paint with off
 // game to try to turn off all the lights as they slowly fade
 
-mode MoveMode = paintNeg;
+mode MoveMode = paintNeg; //default mode
 
 void setup() { 
 	Serial.begin(115200);
+
+  //Wifi connection 
+  WiFi.begin(WIFI_SSID, WIFI_PASSWORD);
+  Serial.print("connecting");
+  while (WiFi.status() != WL_CONNECTED) {
+    Serial.print(".");
+    delay(500);
+  }
 
   for (int i = 0; i < 8; i++) {
     pinMode(IR_LED[i], OUTPUT);
@@ -66,6 +85,15 @@ unsigned long snakeTimer = 0;
 void loop() { 
   static uint8_t hue = 0;
 
+  //Setting the mode from firebase realtime database
+  if(Firebase.getString(firebaseData, "/Led1Mode")){
+    int modeNum = firebaseData.intData(); //retrieves the mode number from firebase
+    MoveMode = (mode) modeNum; //maps the mode number to the enum
+  }
+  else {
+    Serial.println(firebaseData.errorReason()); //error handling
+  }
+
 	for(int i = 0; i < NUM_LEDS; i++) {
     // Account for LED sequence
     int index = i;
@@ -80,7 +108,7 @@ void loop() {
       }
 
       int value = 255 * (IRVals[i]->Current() - IRThresholds[i]) / (1023 - IRThresholds[i]);
-
+     
       switch (MoveMode) {
         case toggle:
           leds[index] = CHSV(hue, 255, 255);
